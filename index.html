@@ -5,6 +5,7 @@
   <title>Diana's Giveaway and Kuhingira Budget</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    /* --- your existing CSS unchanged --- */
     :root {
       --purple-main: #8000b3;
       --purple-light: #ecd8f5;
@@ -37,8 +38,8 @@
     .slide {
       display: none;
       height: 100%;
-      width: 50vw; /* Full height, but only 50vw wide (centered), so 1/4 on each side empty */
-      object-fit: contain; /* Full image, no cropping */
+      width: 50vw;
+      object-fit: contain;
       object-position: center;
       animation: fadein 1s;
       background: #fff;
@@ -152,7 +153,6 @@
     .view-items-btn:hover {
       background: var(--purple-main);
     }
-    /* Modal styles */
     .modal {
       display: none;
       position: fixed;
@@ -209,7 +209,6 @@
     .pledge-btn:hover, .remove-btn:hover {
       background: var(--purple-main);
     }
-    /* Your Pledges modal */
     #pledgesModal .modal-content {
       max-width: 650px;
       padding: 2.5em 2em 2em 2em;
@@ -323,34 +322,24 @@
   <div id="pledgesModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeModal('pledgesModal')">&times;</span>
-      <h2>Your Pledges <span style="font-size:0.7em; color:#666;">(You can edit Item, Qty and Unit Cost)</span></h2>
+      <h2>Your Pledges <span style="font-size:0.7em; color:#666;">(You can edit Amount)</span></h2>
       <div id="pledgesTable"></div>
       <button class="submit-pledge-btn" onclick="submitPledges()">Submit Your Pledge</button>
       <div id="thankYouMsg" style="display:none;text-align:center;color:var(--purple-main);font-size:1.3em;margin-top:1em;"></div>
     </div>
   </div>
   <script>
-    // Slideshow logic
-    let slideIndex = 0;
-    const slides = document.getElementsByClassName("slide");
-    const dots = document.getElementsByClassName("dot");
-    function showSlide(idx) {
-      if (idx >= slides.length) slideIndex = 0;
-      else if (idx < 0) slideIndex = slides.length - 1;
-      else slideIndex = idx;
-      for (let i = 0; i < slides.length; i++) {
-        slides[i].classList.remove("active-slide");
-        dots[i].classList.remove("active");
-      }
-      slides[slideIndex].classList.add("active-slide");
-      dots[slideIndex].classList.add("active");
-    }
-    function nextSlide() { showSlide(slideIndex + 1); }
-    setInterval(() => { nextSlide(); }, 3500);
-    window.showSlide = showSlide;
-    showSlide(0);
+    // === Google Form Integration Configuration ===
+    const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScKRSDRDx2zBiM-8OENRzGGq20aXF1wqVSSeDwUykqVZJuoag/formResponse";
+    const FORM_ENTRY_IDS = {
+      name: "entry.978790917",
+      category: "entry.1309940066",
+      item: "entry.862155150",
+      amount: "entry.1087160984"
+    };
+    // === End Google Form Integration Configuration ===
 
-    // Example data for each category
+    // Example data for each category (as you wanted!)
     const itemsData = {
       venue: {
         title: "Venue",
@@ -388,6 +377,28 @@
         ]
       }
     };
+
+    // Slideshow logic
+    let slideIndex = 0;
+    const slides = document.getElementsByClassName("slide");
+    const dots = document.getElementsByClassName("dot");
+    function showSlide(idx) {
+      if (idx >= slides.length) slideIndex = 0;
+      else if (idx < 0) slideIndex = slides.length - 1;
+      else slideIndex = idx;
+      for (let i = 0; i < slides.length; i++) {
+        slides[i].classList.remove("active-slide");
+        dots[i].classList.remove("active");
+      }
+      slides[slideIndex].classList.add("active-slide");
+      dots[slideIndex].classList.add("active");
+    }
+    function nextSlide() { showSlide(slideIndex + 1); }
+    setInterval(() => { nextSlide(); }, 3500);
+    window.showSlide = showSlide;
+    showSlide(0);
+
+    // Pledge logic
     let pledges = [];
     function showItems(category) {
       const data = itemsData[category];
@@ -407,9 +418,9 @@
               <td>${row.item}</td>
               <td>${row.quantity}</td>
               <td>${row.unit.toLocaleString()}</td>
-              <td>${(row.unit * row.quantity).toLocaleString()}</td>
+              <td>${row.amount.toLocaleString()}</td>
               <td>
-                <button class="pledge-btn" onclick="addPledge('${data.title}', '${row.item}', ${row.quantity}, ${row.unit})">Pledge</button>
+                <button class="pledge-btn" onclick="addPledge('${data.title}', '${row.item}', ${row.amount})">Pledge</button>
               </td>
             </tr>
           `).join('')}
@@ -419,62 +430,99 @@
       document.getElementById('modalContent').innerHTML = table;
       document.getElementById('itemsModal').style.display = 'block';
     }
+
     function closeModal(modalId) {
       document.getElementById(modalId).style.display = 'none';
       if(modalId === "pledgesModal") document.getElementById('thankYouMsg').style.display = 'none';
     }
-    // Add item to pledges
-    function addPledge(category, item, quantity, unit) {
-      // Check if already pledged
-      const idx = pledges.findIndex(p => p.item === item && p.category === category);
+
+    // Add item to pledges and prompt for name and amount
+    function addPledge(category, item, maxAmount) {
+      const name = prompt("Please enter your name for this pledge:");
+      if (!name) return;
+      let amount = prompt(`Enter the amount you wish to pledge for ${item} (max ${maxAmount.toLocaleString()}):`);
+      if (!amount) return;
+      amount = parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0;
+      if (amount <= 0) {
+        alert("Amount must be greater than zero.");
+        return;
+      }
+      if (amount > maxAmount) {
+        alert("You can't pledge more than the full amount for this item.");
+        return;
+      }
+      const pledge = {
+        name,
+        category,
+        item,
+        amount
+      };
+      const idx = pledges.findIndex(p => p.item === item && p.category === category && p.name === name);
       if (idx !== -1) {
         alert("You already added this item, you can edit it in 'Your Pledges'.");
         openPledgesModal();
         return;
       }
-      pledges.push({
-        category,
-        item,
-        quantity,
-        unit,
-        amount: quantity * unit,
-        status: 'Pending'
-      });
+      pledges.push(pledge);
       openPledgesModal();
+      sendPledgeToGoogleForm(pledge);
     }
+
+    // Send a pledge to Google Form (submits as a POST)
+    function sendPledgeToGoogleForm(pledge) {
+      const formData = new FormData();
+      formData.append(FORM_ENTRY_IDS.name, pledge.name);
+      formData.append(FORM_ENTRY_IDS.category, pledge.category);
+      formData.append(FORM_ENTRY_IDS.item, pledge.item);
+      formData.append(FORM_ENTRY_IDS.amount, pledge.amount);
+
+      fetch(GOOGLE_FORM_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: formData
+      });
+    }
+
     function openPledgesModal() {
       renderPledgesTable();
       document.getElementById('pledgesModal').style.display = 'block';
     }
-    // Remove an item from pledges
     function removePledge(idx) {
       pledges.splice(idx, 1);
       renderPledgesTable();
     }
-    // Edit quantity or unit for an item
-    function updatePledge(idx, field, value) {
+    function updatePledge(idx, value) {
       value = parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
       if (value < 0) value = 0;
-      pledges[idx][field] = value;
-      pledges[idx].amount = pledges[idx].quantity * pledges[idx].unit;
+      // Get the max for this item
+      const pledge = pledges[idx];
+      // Find the max for this item/category from itemsData
+      let maxAmount = 0;
+      const cat = Object.values(itemsData).find(c => c.title === pledge.category);
+      if (cat) {
+        const itemObj = cat.items.find(i => i.item === pledge.item);
+        if (itemObj) maxAmount = itemObj.amount;
+      }
+      if (maxAmount && value > maxAmount) {
+        alert("You can't pledge more than the full amount for this item.");
+        value = maxAmount;
+      }
+      pledges[idx].amount = value;
       renderPledgesTable();
     }
     function renderPledgesTable() {
-      let total = pledges.reduce((sum, p) => sum + (p.quantity * p.unit), 0);
+      let total = pledges.reduce((sum, p) => sum + p.amount, 0);
       let rows = pledges.length === 0 ? `
-        <tr><td colspan="7" style="text-align:center;">No pledges yet.</td></tr>
+        <tr><td colspan="6" style="text-align:center;">No pledges yet.</td></tr>
       ` : pledges.map((p, i) => `
         <tr>
           <td>${i + 1}</td>
+          <td>${p.name}</td>
+          <td>${p.category}</td>
           <td>${p.item}</td>
           <td>
-            <input type="number" min="1" value="${p.quantity}" onchange="updatePledge(${i}, 'quantity', this.value)">
+            <input type="number" min="1" value="${p.amount}" onchange="updatePledge(${i}, this.value)">
           </td>
-          <td>
-            <input type="text" value="${p.unit.toLocaleString()}" onchange="updatePledge(${i}, 'unit', this.value)">
-          </td>
-          <td>${(p.quantity * p.unit).toLocaleString()}</td>
-          <td><span class="status-badge">${p.status}</span></td>
           <td>
             <button class="remove-btn" onclick="removePledge(${i})">Remove</button>
           </td>
@@ -484,18 +532,17 @@
         <table class="item-table">
           <tr>
             <th>No</th>
+            <th>Name</th>
+            <th>Category</th>
             <th>Item</th>
-            <th>Qty</th>
-            <th>Unit Cost</th>
             <th>Amount</th>
-            <th>Status</th>
             <th>Action</th>
           </tr>
           ${rows}
           <tr style="background:var(--purple-light);font-weight:bold;">
             <td colspan="4" style="text-align:right;">Total Amount</td>
             <td>${total.toLocaleString()}</td>
-            <td colspan="2"></td>
+            <td></td>
           </tr>
         </table>
       `;
@@ -507,7 +554,6 @@
       renderPledgesTable();
       setTimeout(() => closeModal('pledgesModal'), 2200);
     }
-    // Modal click outside to close
     document.getElementById('itemsModal').addEventListener('click', function(e) {
       if (e.target === this) closeModal('itemsModal');
     });
