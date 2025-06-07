@@ -5,7 +5,6 @@
   <title>Diana's Giveaway and Kuhingira Budget</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    /* --- your existing CSS unchanged --- */
     :root {
       --purple-main: #8000b3;
       --purple-light: #ecd8f5;
@@ -339,7 +338,7 @@
     };
     // === End Google Form Integration Configuration ===
 
-    // Example data for each category (as you wanted!)
+    // Example data for each category
     const itemsData = {
       venue: {
         title: "Venue",
@@ -420,7 +419,7 @@
               <td>${row.unit.toLocaleString()}</td>
               <td>${row.amount.toLocaleString()}</td>
               <td>
-                <button class="pledge-btn" onclick="addPledge('${data.title}', '${row.item}', ${row.amount})">Pledge</button>
+                <button class="pledge-btn" onclick="addPledge('${data.title}', '${row.item}')">Pledge</button>
               </td>
             </tr>
           `).join('')}
@@ -436,36 +435,78 @@
       if(modalId === "pledgesModal") document.getElementById('thankYouMsg').style.display = 'none';
     }
 
-    // Add item to pledges and prompt for name and amount
-    function addPledge(category, item, maxAmount) {
-      const name = prompt("Please enter your name for this pledge:");
-      if (!name) return;
-      let amount = prompt(`Enter the amount you wish to pledge for ${item} (max ${maxAmount.toLocaleString()}):`);
-      if (!amount) return;
-      amount = parseInt(amount.replace(/[^0-9]/g, ''), 10) || 0;
-      if (amount <= 0) {
-        alert("Amount must be greater than zero.");
-        return;
-      }
-      if (amount > maxAmount) {
-        alert("You can't pledge more than the full amount for this item.");
-        return;
-      }
-      const pledge = {
-        name,
-        category,
-        item,
-        amount
-      };
-      const idx = pledges.findIndex(p => p.item === item && p.category === category && p.name === name);
-      if (idx !== -1) {
-        alert("You already added this item, you can edit it in 'Your Pledges'.");
+    // Modal for name and amount (with no max restriction for amount)
+    function addPledge(category, item) {
+      let modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = 0;
+      modal.style.left = 0;
+      modal.style.width = '100vw';
+      modal.style.height = '100vh';
+      modal.style.background = 'rgba(0,0,0,0.25)';
+      modal.style.zIndex = 9999;
+      modal.innerHTML = `
+        <div style="
+          background: #fff;
+          border-radius: 15px;
+          max-width: 95vw;
+          width: 350px;
+          margin: 8% auto 0 auto;
+          padding: 2em;
+          box-shadow: 0 6px 32px rgba(128,0,179,0.18);
+          position:relative;
+        ">
+          <span id="closeForm" style="
+            position: absolute;
+            top: 0.5em; right: 1em; font-size: 2em; color: #e84092; cursor: pointer;">&times;</span>
+          <h2 style="color:var(--purple-main);font-size:1.25em;margin-top:0;">
+            Pledge for <span style="color:var(--pink-main);">${item}</span>
+          </h2>
+          <form id="pledgeForm">
+            <label for="pledgeName" style="font-weight:500;">Your Name:</label><br>
+            <input type="text" id="pledgeName" name="pledgeName" maxlength="50" required pattern="[A-Za-z\\s\\-']+" style="width:94%;margin-bottom:1em;">
+            <br>
+            <label for="pledgeAmount" style="font-weight:500;">Amount (any amount):</label><br>
+            <input type="number" id="pledgeAmount" name="pledgeAmount" min="1" required style="width:94%;margin-bottom:1.6em;">
+            <br>
+            <button type="submit" class="pledge-btn" style="width:94%; font-size:1.13em;">Confirm Pledge</button>
+          </form>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.querySelector('#closeForm').onclick = () => document.body.removeChild(modal);
+
+      modal.querySelector('#pledgeForm').onsubmit = function(e) {
+        e.preventDefault();
+        const name = modal.querySelector('#pledgeName').value.trim();
+        const amountStr = modal.querySelector('#pledgeAmount').value.trim();
+        if (!name || !/^[A-Za-z\s\-']+$/.test(name)) {
+          alert("Please enter a valid name (letters, spaces, hyphens, apostrophes only).");
+          return;
+        }
+        const amount = parseInt(amountStr, 10);
+        if (isNaN(amount) || amount <= 0) {
+          alert("Please enter a valid amount.");
+          return;
+        }
+        const pledge = {
+          name,
+          category,
+          item,
+          amount
+        };
+        const idx = pledges.findIndex(p => p.item === item && p.category === category && p.name === name);
+        if (idx !== -1) {
+          alert("You already added this item, you can edit it in 'Your Pledges'.");
+          document.body.removeChild(modal);
+          openPledgesModal();
+          return;
+        }
+        pledges.push(pledge);
         openPledgesModal();
-        return;
-      }
-      pledges.push(pledge);
-      openPledgesModal();
-      sendPledgeToGoogleForm(pledge);
+        sendPledgeToGoogleForm(pledge);
+        document.body.removeChild(modal);
+      };
     }
 
     // Send a pledge to Google Form (submits as a POST)
@@ -494,19 +535,6 @@
     function updatePledge(idx, value) {
       value = parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
       if (value < 0) value = 0;
-      // Get the max for this item
-      const pledge = pledges[idx];
-      // Find the max for this item/category from itemsData
-      let maxAmount = 0;
-      const cat = Object.values(itemsData).find(c => c.title === pledge.category);
-      if (cat) {
-        const itemObj = cat.items.find(i => i.item === pledge.item);
-        if (itemObj) maxAmount = itemObj.amount;
-      }
-      if (maxAmount && value > maxAmount) {
-        alert("You can't pledge more than the full amount for this item.");
-        value = maxAmount;
-      }
       pledges[idx].amount = value;
       renderPledgesTable();
     }
